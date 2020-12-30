@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -130,4 +131,37 @@ func writeToStoreFile(storeFile *os.File, keyValue *KeyValue) error {
 			keyValue.Key, valueStr, keyValue.Time, keyValue.ValidTill))
 
 	return err
+}
+
+// updateStoreFile will update the store file to a new state after removing the
+// deleted keys. This function works by first removing the old store file. Then
+// a new store file is created and the remaning key value pairs are written to
+// that new store file. And then the old store file is replaced by the new file
+func updateStoreFile(store *Store, storeMap *map[string]*KeyValue) error {
+	storeFile := store.StoreFile
+	storeFilePath, err := filepath.Abs(storeFile.Name())
+	if err != nil {
+		return err
+	}
+
+	if err = os.Remove(storeFile.Name()); err != nil {
+		return err
+	}
+
+	newStoreFile, err := os.OpenFile(storeFilePath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+
+	if _, err = newStoreFile.WriteAt([]byte{'1'}, 0); err != nil {
+		return err
+	}
+
+	for _, keyValue := range *storeMap {
+		writeToStoreFile(newStoreFile, keyValue)
+	}
+
+	store.StoreFile = newStoreFile
+
+	return nil
 }
