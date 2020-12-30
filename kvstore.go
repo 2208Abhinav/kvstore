@@ -170,3 +170,20 @@ func Delete(store *Store, key string) error {
 
 	return err
 }
+
+// Read is called by the client to find value of a key in the store
+func Read(store *Store, key string) (*KeyValue, error) {
+	value, ok := (*store.StoreMap)[key]
+
+	isExpired := ok && (value.Time != 0 && value.ValidTill < time.Now().Unix())
+	if !ok || isExpired {
+		// if the key is expired then it should be deleted from the key value store
+		if isExpired {
+			Delete(store, key)
+		}
+
+		return nil, errors.New("key not found")
+	}
+
+	return value, nil
+}
