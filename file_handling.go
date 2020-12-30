@@ -1,6 +1,9 @@
 package kvstore
 
 import (
+	"bufio"
+	"encoding/json"
+	"io"
 	"os"
 	"strconv"
 )
@@ -38,4 +41,54 @@ func toggleFlag(storeFile *os.File) error {
 	}
 
 	return err
+}
+
+// readStoreFile will read all the content in given store file and will
+// unmarshal the content in the usable JSON Object as represented by
+// map[string]interface{} in golang
+func readStoreFile(fi *os.File) (*map[string]*KeyValue, error) {
+	content := []byte{}
+	content = append(content, byte('{'))
+	// make a read buffer
+	r := bufio.NewReader(fi)
+	buf := make([]byte, 1024)
+
+	flag := ""
+	for {
+		// read a chunk of key value pair
+		n, err := r.Read(buf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		i := 0
+		for i < n {
+			if len(flag) == 0 && i == 0 {
+				flag = string(buf[i])
+			} else {
+				content = append(content, buf[i])
+			}
+			i++
+		}
+
+		if n == 0 {
+			break
+		}
+	}
+	// remove the extra invalid ","
+	if len(content) > 1 {
+		content = content[:len(content)-1]
+	}
+	content = append(content, byte('}'))
+
+	var result map[string]*KeyValue
+	if err := json.Unmarshal(content, &result); err != nil {
+		return nil, err
+	}
+
+	for key, keyValue := range result {
+		keyValue.Key = key
+	}
+
+	return &result, nil
 }
