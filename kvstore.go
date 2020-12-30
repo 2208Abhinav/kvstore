@@ -1,8 +1,11 @@
 package kvstore
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"sync"
+	"time"
 )
 
 // mutex lock for making the functions thread safe
@@ -40,4 +43,60 @@ type Store struct {
 	StoreFile    *os.File
 	StoreMap     *map[string]*KeyValue
 	deletesCount int
+}
+
+// Init is called by the client to initialize the key value store
+func Init(storePath string) (*Store, error) {
+	var storeFile *os.File
+	var err error
+
+	if _, err = os.Stat(storePath); err == nil {
+		// store file already exists
+		storeFile, err = os.OpenFile(storePath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+		if err != nil {
+			return nil, err
+		}
+	} else if os.IsNotExist(err) {
+		// store file doesn't exist
+		if len(storePath) == 0 {
+			// if no path is provided then by default the store file is created in
+			// the parent directory of the project that is using this library with
+			// file name as the current unix timestamp
+			storePath = fmt.Sprintf("%v.store", time.Now().Unix())
+		}
+		storeFile, err = os.OpenFile(storePath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+		if err != nil {
+			return nil, err
+		}
+
+		// this acts as a flag to prevent other client from using this key value store if it
+		// is already in use. If this value is 0 then the store is not in use otherwise the store
+		// is in use if the value is 1
+		_, err = storeFile.WriteString("0")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// some unknown error occurred
+		return nil, err
+	}
+
+	flag, err := getFlag(storeFile)
+	if err != nil {
+		return nil, err
+	} else if flag == 1 {
+		return nil, errors.New("store already in use by some other client")
+	}
+
+	err = toggleFlag(storeFile)
+	if err != nil {
+		return nil, err
+	}
+
+	store := &Store{StoreFile: storeFile}
+	if store.StoreMap, err = readStoreFile(store.StoreFile); err != nil {
+		return nil, err
+	}
+
+	return store, nil
 }
