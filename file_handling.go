@@ -20,3 +20,22 @@ func getFlag(storeFile *os.File) (int, error) {
 
 	return strconv.Atoi(string(flag))
 }
+
+// toggleFlag is used to toggle the state of the store file. The state is used
+// for determining whether the file is in use by other client or not
+func toggleFlag(storeFile *os.File) error {
+	flag, err := getFlag(storeFile)
+	if err != nil {
+		return err
+	}
+
+	if flag == 0 {
+		// change the flag to 1 because this file is now used by the current client
+		_, err = storeFile.WriteAt([]byte{'1'}, 0)
+	} else {
+		// change the flag to 0 because this file is not used by any client
+		_, err = storeFile.WriteAt([]byte{'0'}, 0)
+	}
+
+	return err
+}
