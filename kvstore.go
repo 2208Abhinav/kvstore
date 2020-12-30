@@ -154,6 +154,9 @@ func Delete(store *Store, key string) error {
 	if _, ok := (*store.StoreMap)[key]; !ok {
 		return errors.New("key not present")
 	}
+	value := (*store.StoreMap)[key]
+	isExpired := value.Time != 0 && value.ValidTill < time.Now().Unix()
+
 	delete(*store.StoreMap, key)
 
 	store.deletesCount++
@@ -166,6 +169,10 @@ func Delete(store *Store, key string) error {
 		if err != nil {
 			store.deletesCount = 0
 		}
+	}
+
+	if isExpired {
+		return errors.New("key not present")
 	}
 
 	return err
