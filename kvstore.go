@@ -148,3 +148,25 @@ func Create(store *Store, key string, value map[string]interface{}, expireTime i
 	defer lock.Unlock()
 	return writeToStoreFile(store.StoreFile, keyValue)
 }
+
+// Delete is called by the client to delete a key value pair from the store
+func Delete(store *Store, key string) error {
+	if _, ok := (*store.StoreMap)[key]; !ok {
+		return errors.New("key not present")
+	}
+	delete(*store.StoreMap, key)
+
+	store.deletesCount++
+
+	var err error
+	if store.deletesCount > _DeleteThreshold {
+		lock.Lock()
+		defer lock.Unlock()
+		err = updateStoreFile(store, store.StoreMap)
+		if err != nil {
+			store.deletesCount = 0
+		}
+	}
+
+	return err
+}
