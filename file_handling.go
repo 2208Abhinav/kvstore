@@ -3,9 +3,12 @@ package kvstore
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"time"
 )
 
 // getFlag is used to determine the state of the store file. If it is in use by
@@ -91,4 +94,40 @@ func readStoreFile(fi *os.File) (*map[string]*KeyValue, error) {
 	}
 
 	return &result, nil
+}
+
+// writeToStoreFile will be used to marshal the given key value pair
+// and write to the store file for persistence
+func writeToStoreFile(storeFile *os.File, keyValue *KeyValue) error {
+	info, err := storeFile.Stat()
+	if err != nil {
+		return err
+	}
+	// according to the requirement the store file size cannot exceed 1GB
+	if info.Size() > _GB {
+		return errors.New("size of store file cannot exceed 1GB")
+	}
+
+	// set the unix time stamp till which the key is valid
+	// otherwise the 0 timestamp means the key value pair is valid forever
+	if keyValue.Time != 0 {
+		keyValue.ValidTill = time.Now().Unix() + keyValue.Time
+	}
+
+	valueStrBytes, err := json.Marshal(keyValue.Value)
+	if err != nil {
+		return err
+	}
+
+	valueStr := string(valueStrBytes)
+	// 1 character takes 1 byte in file
+	if len(valueStr) > 16*_KB {
+		return errors.New("size of value cannot exceed 16KB")
+	}
+
+	_, err = storeFile.WriteString(
+		fmt.Sprintf("\"%v\":{\"value\":%v,\"time\":%v,\"validTill\":%v},",
+			keyValue.Key, valueStr, keyValue.Time, keyValue.ValidTill))
+
+	return err
 }
