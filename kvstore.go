@@ -100,3 +100,18 @@ func Init(storePath string) (*Store, error) {
 
 	return store, nil
 }
+
+// Close is called by client to close the key value store
+func Close(store *Store) error {
+	if store.deletesCount > 0 {
+		if err := updateStoreFile(store, store.StoreMap); err != nil {
+			return err
+		}
+	}
+
+	if err := toggleFlag(store.StoreFile); err != nil {
+		return err
+	}
+
+	return store.StoreFile.Close()
+}
