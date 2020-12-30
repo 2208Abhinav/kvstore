@@ -115,3 +115,36 @@ func Close(store *Store) error {
 
 	return store.StoreFile.Close()
 }
+
+// Create is used for creating a key value pair in the store
+func Create(store *Store, key string, value map[string]interface{}, expireTime int64) error {
+	if len(key) == 0 {
+		return errors.New("key cannot be empty")
+	} else if len(key) > 32 {
+		return errors.New("key size cannot exceed 32 characters")
+	}
+
+	if _, ok := (*store.StoreMap)[key]; ok {
+		value := (*store.StoreMap)[key]
+		isExpired := value.Time != 0 && value.ValidTill < time.Now().Unix()
+		if !isExpired {
+			return errors.New("key already present")
+		}
+		// increase the delete counter to trigger the update of store file later
+		// because the old value for the expired key should be updated with the
+		// new value
+		store.deletesCount++
+	}
+
+	keyValue := &KeyValue{
+		Key:   key,
+		Value: value,
+		Time:  expireTime,
+	}
+
+	(*store.StoreMap)[key] = keyValue
+
+	lock.Lock()
+	defer lock.Unlock()
+	return writeToStoreFile(store.StoreFile, keyValue)
+}
