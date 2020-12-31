@@ -100,7 +100,7 @@ if err := kvstore.Close(store); err != nil {
 ```
 
 **More than one client cannot be allowed to use the same file as data store at any given time:**
-- The store contains a flag at the beginning of the the. The flag has two values, 0 or 1.
+- The store contains a flag at the beginning of the store file. The flag has two values, 0 or 1.
     - **1** - the store file is already in use by some other client and you cannot access the store file.
     - **0** - the store file is not in use by any other client.
 - `kvstore.Init("...")` checks the status of the file. It initializes and returns the store if the flag is 0 otherwise it returns error if the flag is 1 and the store is already in use by some other client.
